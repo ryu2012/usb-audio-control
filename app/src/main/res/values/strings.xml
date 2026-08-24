@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">USB Audio Control</string>
+    <string name="widget_name">メディア出力先</string>
+    <string name="widget_description">現在のメディア出力デバイスを表示します</string>
+</resources>

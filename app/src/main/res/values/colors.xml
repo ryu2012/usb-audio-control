@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="navy">#08131F</color>
+    <color name="surface">#101E2C</color>
+    <color name="surface_raised">#17293A</color>
+    <color name="cyan">#4ED7C8</color>
+    <color name="text_primary">#F3F7FA</color>
+    <color name="text_secondary">#A8B6C4</color>
+    <color name="launcher_background">#08131F</color>
+</resources>
