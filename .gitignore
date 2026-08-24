@@ -1,0 +1,19 @@
+# Android Studio / Gradle
+.gradle/
+.idea/
+build/
+**/build/
+local.properties
+*.iml
+
+# Signing and generated packages
+*.jks
+*.keystore
+*.apk
+*.aab
+
+# OS files and local deliverables
+.DS_Store
+Thumbs.db
+outputs/
+work/
