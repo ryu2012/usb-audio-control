@@ -97,9 +97,9 @@ public final class AudioRouteWidgetProvider extends AppWidgetProvider {
             AudioDeviceInfo first = devices.get(0);
             return new Route(
                     android.text.TextUtils.join(" + ", names),
-                    typeName(first.getType()) + "・更新 " + updated);
+                    "• " + typeName(first.getType()) + " (" + updated + ")");
         } catch (SecurityException error) {
-            return new Route("出力先を取得できません", "権限を確認してください・更新 " + updated);
+            return new Route("出力先を取得できません", "• 権限を確認 (" + updated + ")");
         }
     }
 
