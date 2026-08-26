@@ -3,11 +3,14 @@ package dev.ryohanzawa.usbaudiocontrol;
 import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.BroadcastReceiver;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.content.res.ColorStateList;
 import android.database.ContentObserver;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -27,6 +30,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.Switch;
 import android.widget.TextView;
@@ -48,13 +52,23 @@ public final class MainActivity extends Activity {
     private TextView permissionBadge;
     private TextView activeDeviceName;
     private TextView activeDeviceDetails;
+    private ProgressBar volumeProgressBar;
+    private TextView volumeLevelText;
     private LinearLayout deviceList;
     private boolean bindingSwitch;
 
     private final Runnable periodicAudioRefresh = new Runnable() {
         @Override public void run() {
             refreshAudioDevices();
+            refreshVolume();
             mainHandler.postDelayed(this, 2000);
+        }
+    };
+
+    private final BroadcastReceiver volumeReceiver = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            refreshVolume();
+            AudioRouteWidgetProvider.updateAll(MainActivity.this);
         }
     };
 
@@ -86,6 +100,8 @@ public final class MainActivity extends Activity {
         audioManager.registerAudioDeviceCallback(audioDeviceCallback, mainHandler);
         getContentResolver().registerContentObserver(
                 Settings.Secure.getUriFor(SETTING_KEY), false, settingObserver);
+        IntentFilter filter = new IntentFilter("android.media.VOLUME_CHANGED_ACTION");
+        registerReceiver(volumeReceiver, filter);
         refreshAll();
         AudioRouteWidgetProvider.updateAll(this);
         mainHandler.postDelayed(periodicAudioRefresh, 2000);
@@ -95,6 +111,9 @@ public final class MainActivity extends Activity {
     protected void onStop() {
         getContentResolver().unregisterContentObserver(settingObserver);
         audioManager.unregisterAudioDeviceCallback(audioDeviceCallback);
+        try {
+            unregisterReceiver(volumeReceiver);
+        } catch (Exception ignored) {}
         mainHandler.removeCallbacks(periodicAudioRefresh);
         super.onStop();
     }
@@ -155,6 +174,26 @@ public final class MainActivity extends Activity {
         activeDeviceDetails.setLineSpacing(dp(3), 1f);
         outputCard.addView(activeDeviceDetails, margins(matchWrap(), 0, 6, 0, 0));
 
+        View volDivider = new View(this);
+        volDivider.setBackgroundColor(Color.rgb(42, 62, 79));
+        outputCard.addView(volDivider, margins(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(1)), 0, 14, 0, 12));
+
+        LinearLayout volRow = row();
+        TextView volTitle = text("メディア音量", 12, Color.rgb(168, 182, 196));
+        volTitle.setTypeface(Typeface.DEFAULT_BOLD);
+        volRow.addView(volTitle, weighted());
+        volumeLevelText = text("0%", 12, Color.rgb(78, 215, 200));
+        volumeLevelText.setTypeface(Typeface.DEFAULT_BOLD);
+        volRow.addView(volumeLevelText, wrapWrap());
+        outputCard.addView(volRow, matchWrap());
+
+        volumeProgressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        volumeProgressBar.setProgressTintList(ColorStateList.valueOf(Color.rgb(78, 215, 200)));
+        volumeProgressBar.setProgressBackgroundTintList(ColorStateList.valueOf(Color.rgb(32, 54, 76)));
+        outputCard.addView(volumeProgressBar, margins(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(8)), 0, 8, 0, 0));
+
         LinearLayout devicesCard = card();
         root.addView(devicesCard, margins(matchWrap(), 0, 0, 0, 16));
         devicesCard.addView(sectionLabel("接続中の出力デバイス"));
@@ -183,6 +222,35 @@ public final class MainActivity extends Activity {
     private void refreshAll() {
         refreshSetting();
         refreshAudioDevices();
+        refreshVolume();
+    }
+
+    private void refreshVolume() {
+        if (audioManager == null || volumeProgressBar == null || volumeLevelText == null) return;
+        int stream = AudioManager.STREAM_MUSIC;
+        int current = audioManager.getStreamVolume(stream);
+        int max = audioManager.getStreamMaxVolume(stream);
+        int min = 0;
+        if (Build.VERSION.SDK_INT >= 28) {
+            min = audioManager.getStreamMinVolume(stream);
+        }
+        int range = max - min;
+        int percent = range > 0 ? Math.round(((float) (current - min) / range) * 100f) : 0;
+        volumeProgressBar.setMax(100);
+        volumeProgressBar.setProgress(percent);
+
+        boolean isMuted = false;
+        if (Build.VERSION.SDK_INT >= 23) {
+            isMuted = audioManager.isStreamMute(stream);
+        }
+        if (current == 0 || isMuted) {
+            volumeLevelText.setText(String.format(Locale.JAPAN, "🔇 0%% (0/%d)", max));
+            volumeLevelText.setTextColor(Color.rgb(255, 107, 107));
+        } else {
+            String icon = percent > 50 ? "🔊" : "🔉";
+            volumeLevelText.setText(String.format(Locale.JAPAN, "%s %d%% (%d/%d)", icon, percent, current, max));
+            volumeLevelText.setTextColor(Color.rgb(78, 215, 200));
+        }
     }
 
     private void refreshSetting() {

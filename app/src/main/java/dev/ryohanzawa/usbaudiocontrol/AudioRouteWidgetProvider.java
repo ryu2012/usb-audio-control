@@ -6,6 +6,7 @@ import android.appwidget.AppWidgetProvider;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
 import android.media.AudioAttributes;
 import android.media.AudioDeviceInfo;
 import android.media.AudioManager;
@@ -46,6 +47,13 @@ public final class AudioRouteWidgetProvider extends AppWidgetProvider {
         Route route = readMediaRoute(context);
         views.setTextViewText(R.id.widget_device_name, route.name);
         views.setTextViewText(R.id.widget_device_details, route.details);
+
+        VolumeInfo volume = readMediaVolume(context);
+        views.setProgressBar(R.id.widget_volume_progress, 100, volume.percent, false);
+        views.setTextViewText(R.id.widget_volume_text, volume.text);
+        views.setTextColor(R.id.widget_volume_text, volume.isMuted
+                ? Color.rgb(255, 107, 107)
+                : Color.rgb(78, 215, 200));
 
         Intent refreshIntent = new Intent(context, AudioRouteWidgetProvider.class)
                 .setAction(ACTION_REFRESH);
@@ -120,6 +128,33 @@ public final class AudioRouteWidgetProvider extends AppWidgetProvider {
         }
     }
 
+    private static VolumeInfo readMediaVolume(Context context) {
+        AudioManager audioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+        if (audioManager == null) return new VolumeInfo(0, "0%", false);
+        int stream = AudioManager.STREAM_MUSIC;
+        int current = audioManager.getStreamVolume(stream);
+        int max = audioManager.getStreamMaxVolume(stream);
+        int min = 0;
+        if (Build.VERSION.SDK_INT >= 28) {
+            min = audioManager.getStreamMinVolume(stream);
+        }
+        int range = max - min;
+        int percent = range > 0 ? Math.round(((float) (current - min) / range) * 100f) : 0;
+        boolean isMuted = false;
+        if (Build.VERSION.SDK_INT >= 23) {
+            isMuted = audioManager.isStreamMute(stream);
+        }
+        boolean zeroOrMuted = current == 0 || isMuted;
+        String text;
+        if (zeroOrMuted) {
+            text = "🔇 0%";
+        } else {
+            String icon = percent > 50 ? "🔊" : "🔉";
+            text = String.format(Locale.JAPAN, "%s %d%%", icon, percent);
+        }
+        return new VolumeInfo(percent, text, zeroOrMuted);
+    }
+
     private static final class Route {
         final String name;
         final String details;
@@ -127,6 +162,18 @@ public final class AudioRouteWidgetProvider extends AppWidgetProvider {
         Route(String name, String details) {
             this.name = name;
             this.details = details;
+        }
+    }
+
+    private static final class VolumeInfo {
+        final int percent;
+        final String text;
+        final boolean isMuted;
+
+        VolumeInfo(int percent, String text, boolean isMuted) {
+            this.percent = percent;
+            this.text = text;
+            this.isMuted = isMuted;
         }
     }
 }
